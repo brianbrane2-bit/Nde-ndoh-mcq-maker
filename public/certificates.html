@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificates - SmartAssess</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <div class="logo">
+                <span class="logo-icon">📚</span>
+                <span>SmartAssess</span>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span></span><span></span><span></span>
+            </div>
+            <div class="nav-menu" id="navMenu">
+                <a href="/"><i class="fas fa-home"></i> Home</a>
+                <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a>
+                <a href="/certificates" class="active"><i class="fas fa-certificate"></i> Certificates</a>
+                <div class="user-info">
+                    <span class="user-name" id="userName"></span>
+                    <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-certificate"></i> Your Certificates</h3>
+            </div>
+            <div id="certificatesList">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/script.js"></script>
+    <script>
+        async function loadCertificates() {
+            const historyResponse = await fetch('/api/results/history', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const history = await historyResponse.json();
+            const passedExams = history.filter(h => h.passed);
+            
+            const container = document.getElementById('certificatesList');
+            if (passedExams.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 40px;">No certificates yet. Pass an exam to earn a certificate!</p>';
+                return;
+            }
+            
+            container.innerHTML = passedExams.map(async (exam) => {
+                const certResponse = await fetch(`/api/certificates/${exam.id}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const cert = await certResponse.json();
+                
+                return `
+                    <div class="certificate" id="cert-${exam.id}">
+                        <h1>🏆 Certificate of Achievement 🏆</h1>
+                        <p>This certificate is proudly presented to</p>
+                        <h3>${escapeHtml(cert.studentName)}</h3>
+                        <p>for successfully completing</p>
+                        <h2>${escapeHtml(cert.examTitle)}</h2>
+                        <p>with a score of <strong>${cert.score}</strong></p>
+                        <p>Date: ${new Date(cert.date).toLocaleDateString()}</p>
+                        <div class="certificate-id">Certificate ID: ${cert.certificateId}</div>
+                        <button class="btn btn-primary" onclick="printCertificate(${exam.id})" style="margin-top: 20px;">
+                            <i class="fas fa-print"></i> Print Certificate
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function printCertificate(examId) {
+            const certContent = document.getElementById(`cert-${examId}`).cloneNode(true);
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Certificate</title>
+                        <style>
+                            body {
+                                font-family: Arial, sans-serif;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                min-height: 100vh;
+                                margin: 0;
+                                padding: 20px;
+                            }
+                            .certificate {
+                                border: 10px solid #4F46E5;
+                                padding: 50px;
+                                text-align: center;
+                                max-width: 800px;
+                                margin: 0 auto;
+                            }
+                            button { display: none; }
+                        </style>
+                    </head>
+                    <body>
+                        ${certContent.outerHTML}
+                        <script>window.print();<\/script>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+        
+        loadCertificates();
+    </script>
+</body>
+</html>

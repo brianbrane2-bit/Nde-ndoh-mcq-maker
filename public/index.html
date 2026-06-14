@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartAssess - Professional MCQ Assessment Platform</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Quick fixes for missing styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show, .modal.active {
+            display: flex !important;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .close {
+            float: right;
+            cursor: pointer;
+            font-size: 24px;
+        }
+        .password-strength {
+            margin-top: 5px;
+            height: 4px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            background: #e5e7eb;
+        }
+        .password-strength.weak { width: 33%; background: #ef4444; }
+        .password-strength.medium { width: 66%; background: #f59e0b; }
+        .password-strength.strong { width: 100%; background: #10b981; }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 10000;
+        }
+        .toast.success { border-left: 4px solid #10b981; }
+        .toast.error { border-left: 4px solid #ef4444; }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .auth-divider {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+        .auth-divider span {
+            background: white;
+            padding: 0 10px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body class="auth-page">
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="logo">
+                <span class="logo-icon">📚</span>
+                <span>SmartAssess</span>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span></span><span></span><span></span>
+            </div>
+            <div class="nav-menu" id="navMenu">
+                <a href="/" class="active"><i class="fas fa-home"></i> Home</a>
+                <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="/create-exam"><i class="fas fa-plus-circle"></i> Create Exam</a>
+                <a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a>
+                <a href="/certificates"><i class="fas fa-certificate"></i> Certificates</a>
+                <a href="/profile"><i class="fas fa-user"></i> Profile</a>
+                <div id="authButtons" class="auth-buttons">
+                    <button class="btn btn-outline" onclick="showLoginModal()">Login</button>
+                    <button class="btn btn-primary" onclick="showRegisterModal()">Register</button>
+                </div>
+                <div id="userInfo" class="user-info" style="display: none;">
+                    <span class="user-name" id="userName"></span>
+                    <button class="btn btn-danger" id="logoutBtn">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <div class="hero fade-in">
+            <h1>Welcome to SmartAssess</h1>
+            <p>The Ultimate Automated MCQ Assessment Platform</p>
+            <button class="btn btn-primary" onclick="showRegisterModal()">
+                <i class="fas fa-user-plus"></i> Get Started Free
+            </button>
+        </div>
+
+        <!-- Features -->
+        <div class="stats-grid" style="margin-bottom: 40px;">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-robot"></i></div>
+                <h3>Auto-Grading</h3>
+                <p>Instant results with detailed feedback</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-chart-simple"></i></div>
+                <h3>Analytics Dashboard</h3>
+                <p>Track your progress over time</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-certificate"></i></div>
+                <h3>Certificates</h3>
+                <p>Earn printable certificates for passing</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-shield-alt"></i></div>
+                <h3>Secure Platform</h3>
+                <p>Your data is protected</p>
+            </div>
+        </div>
+
+        <!-- Available Exams Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-file-alt"></i> Available Exams</h2>
+                <select id="subjectFilter" class="btn-outline" style="padding: 8px 16px;">
+                    <option value="all">All Subjects</option>
+                </select>
+            </div>
+            <div id="examsList" class="exam-grid">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModals()">&times;</span>
+            <h2><i class="fas fa-sign-in-alt"></i> Welcome Back</h2>
+            <p style="color: #6c757d; margin-bottom: 20px;">Sign in to continue your learning journey</p>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Username or Email</label>
+                    <input type="text" id="loginUsername" required placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" required placeholder="Enter your password">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox"> Remember me
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+            </form>
+            <div class="auth-divider"><span>or</span></div>
+            <p style="margin-top: 20px; text-align: center; color: #6c757d;">
+                Don't have an account? <a href="#" onclick="showRegisterModal(); return false;" style="color: #10b981;">Create one</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Register Modal - COMPLETELY FIXED -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModals()">&times;</span>
+            <h2><i class="fas fa-user-plus"></i> Create Account</h2>
+            <p style="color: #6c757d; margin-bottom: 20px;">Join thousands of learners and educators</p>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="regFullName" required placeholder="Enter your full name">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="regUsername" required placeholder="Choose a username">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="regEmail" required placeholder="your@email.com">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Create Password</label>
+                        <input type="password" id="regPassword" required placeholder="Create a password">
+                        <div id="passwordStrength" class="password-strength"></div>
+                        <small style="color: #6c757d; font-size: 12px;">
+                            <span id="passwordHint">Use 6+ characters with letters and numbers</span>
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" id="regConfirmPassword" required placeholder="Confirm your password">
+                        <div id="passwordMatchHint" style="font-size: 12px; margin-top: 5px;"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Register as</label>
+                    <select id="regRole">
+                        <option value="student">🎓 Student - Take exams and track progress</option>
+                        <option value="teacher">👨‍🏫 Teacher - Create and manage exams</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="termsCheckbox" required>
+                        I agree to the <a href="#" style="color: #10b981;">Terms of Service</a> and <a href="#" style="color: #10b981;">Privacy Policy</a>
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-user-plus"></i> Create Free Account
+                </button>
+            </form>
+            <div class="auth-divider"><span>Already have an account?</span></div>
+            <p style="text-align: center;">
+                <a href="#" onclick="showLoginModal(); return false;" style="color: #10b981;">Sign in instead</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+    // ============ GLOBAL FUNCTIONS ============
+    
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `toast ${type}`;
+        notification.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${message}`;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
+    
+    function showLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (modal) modal.style.display = 'flex';
+    }
+    
+    function showRegisterModal() {
+        const modal = document.getElementById('registerModal');
+        if (modal) modal.style.display = 'flex';
+    }
+    
+    function closeModals() {
+        const loginModal = document.getElementById('loginModal');
+        const registerModal = document.getElementById('registerModal');
+        if (loginModal) loginModal.style.display = 'none';
+        if (registerModal) registerModal.style.display = 'none';
+    }
+    
+    // ============ PASSWORD STRENGTH ============
+    
+    function checkPasswordStrength() {
+        const password = document.getElementById('regPassword');
+        if (!password) return;
+        
+        const strengthDiv = document.getElementById('passwordStrength');
+        const passwordHint = document.getElementById('passwordHint');
+        
+        if (!strengthDiv) return;
+        
+        const val = password.value;
+        
+        if (!val) {
+            strengthDiv.className = 'password-strength';
+            if (passwordHint) passwordHint.innerHTML = 'Use 6+ characters with letters and numbers';
+            return;
+        }
+        
+        let strength = 0;
+        if (val.length >= 6) strength++;
+        if (val.length >= 10) strength++;
+        if (/[A-Z]/.test(val)) strength++;
+        if (/[0-9]/.test(val)) strength++;
+        if (/[^A-Za-z0-9]/.test(val)) strength++;
+        
+        strengthDiv.className = 'password-strength';
+        
+        if (strength <= 2) {
+            strengthDiv.classList.add('weak');
+            if (passwordHint) passwordHint.innerHTML = 'Weak - add uppercase, numbers, or special characters';
+        } else if (strength <= 4) {
+            strengthDiv.classList.add('medium');
+            if (passwordHint) passwordHint.innerHTML = 'Medium - good, but could be stronger';
+        } else {
+            strengthDiv.classList.add('strong');
+            if (passwordHint) passwordHint.innerHTML = '✓ Strong password!';
+        }
+    }
+    
+    function checkPasswordMatch() {
+        const password = document.getElementById('regPassword');
+        const confirm = document.getElementById('regConfirmPassword');
+        const matchHint = document.getElementById('passwordMatchHint');
+        
+        if (!password || !confirm || !matchHint) return;
+        
+        if (!confirm.value) {
+            matchHint.innerHTML = '';
+            return;
+        }
+        
+        if (password.value === confirm.value) {
+            matchHint.innerHTML = '✓ Passwords match';
+            matchHint.style.color = '#10b981';
+        } else {
+            matchHint.innerHTML = '✗ Passwords do not match';
+            matchHint.style.color = '#ef4444';
+        }
+    }
+    
+    // ============ AUTHENTICATION FUNCTIONS ============
+    
+    function checkAuth() {
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+        
+        if (token && user) {
+            const userData = JSON.parse(user);
+            const userNameSpan = document.getElementById('userName');
+            if (userNameSpan) userNameSpan.textContent = userData.full_name || userData.username;
+            const userInfo = document.getElementById('userInfo');
+            if (userInfo) userInfo.style.display = 'flex';
+            const authButtons = document.getElementById('authButtons');
+            if (authButtons) authButtons.style.display = 'none';
+            loadExams();
+        } else {
+            const userInfo = document.getElementById('userInfo');
+            if (userInfo) userInfo.style.display = 'none';
+            const authButtons = document.getElementById('authButtons');
+            if (authButtons) authButtons.style.display = 'flex';
+        }
+    }
+    
+    async function login(username, password) {
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                showNotification('Welcome back!', 'success');
+                closeModals();
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 1000);
+            } else {
+                showNotification(data.error || 'Login failed', 'error');
+            }
+        } catch (error) {
+            showNotification('Network error. Please try again.', 'error');
+        }
+    }
+    
+    async function register(fullName, username, email, password, confirmPassword, role) {
+        if (password !== confirmPassword) {
+            showNotification('Passwords do not match!', 'error');
+            return;
+        }
+        
+        if (password.length < 6) {
+            showNotification('Password must be at least 6 characters!', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ full_name: fullName, username, email, password, role })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                showNotification('Account created successfully!', 'success');
+                closeModals();
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 1500);
+            } else {
+                showNotification(data.error || 'Registration failed', 'error');
+            }
+        } catch (error) {
+            showNotification('Network error. Please try again.', 'error');
+        }
+    }
+    
+    function logout() {
+        localStorage.clear();
+        showNotification('Logged out successfully', 'success');
+        window.location.href = '/';
+    }
+    
+    // ============ EXAM FUNCTIONS ============
+    
+    async function loadExams() {
+        const token = localStorage.getItem('token');
+        const container = document.getElementById('examsList');
+        if (!container) return;
+        
+        if (!token) {
+            container.innerHTML = '<p style="text-align: center; padding: 40px;">Please login to view exams</p>';
+            return;
+        }
+        
+        const subject = document.getElementById('subjectFilter')?.value || 'all';
+        
+        try {
+            const response = await fetch(`/api/exams?subject=${subject}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const exams = await response.json();
+            
+            if (exams.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 40px;">No exams available at the moment.</p>';
+                return;
+            }
+            
+            container.innerHTML = exams.map(exam => `
+                <div class="exam-card" onclick="startExam(${exam.id})">
+                    <div style="padding: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <h3>${escapeHtml(exam.title)}</h3>
+                            <span class="exam-badge">${exam.total_questions || 0} Questions</span>
+                        </div>
+                        <p style="margin: 10px 0;">${exam.subject || 'General'}</p>
+                        <div style="margin-top: 15px; display: flex; gap: 15px; font-size: 13px;">
+                            <span><i class="fas fa-clock"></i> ${exam.time_limit} min</span>
+                            <span><i class="fas fa-trophy"></i> Pass: ${exam.passing_score}%</span>
+                        </div>
+                        <button class="btn btn-primary" style="margin-top: 15px; width: 100%;">Start Exam</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Load exams error:', error);
+        }
+    }
+    
+    async function startExam(examId) {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showNotification('Please login first', 'error');
+            showLoginModal();
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/exams/${examId}/start`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const data = await response.json();
+            if (response.ok) {
+                window.location.href = `/take-exam/${examId}?attempt=${data.attemptId}`;
+            } else {
+                showNotification(data.error, 'error');
+            }
+        } catch (error) {
+            showNotification('Error starting exam', 'error');
+        }
+    }
+    
+    async function loadSubjects() {
+        try {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const filter = document.getElementById('subjectFilter');
+            if (filter && subjects && subjects.length > 0) {
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.subject;
+                    option.textContent = subject.subject;
+                    filter.appendChild(option);
+                });
+            }
+        } catch (error) {}
+    }
+    
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // ============ EVENT LISTENERS ============
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Login form
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const username = document.getElementById('loginUsername').value;
+                const password = document.getElementById('loginPassword').value;
+                login(username, password);
+            });
+        }
+        
+        // Register form
+        const registerForm = document.getElementById('registerForm');
+        if (registerForm) {
+            registerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const fullName = document.getElementById('regFullName').value;
+                const username = document.getElementById('regUsername').value;
+                const email = document.getElementById('regEmail').value;
+                const password = document.getElementById('regPassword').value;
+                const confirmPassword = document.getElementById('regConfirmPassword').value;
+                const role = document.getElementById('regRole').value;
+                const termsChecked = document.getElementById('termsCheckbox')?.checked;
+                
+                if (!termsChecked) {
+                    showNotification('Please agree to the Terms of Service', 'error');
+                    return;
+                }
+                
+                register(fullName, username, email, password, confirmPassword, role);
+            });
+        }
+        
+        // Password strength checker
+        const regPassword = document.getElementById('regPassword');
+        if (regPassword) {
+            regPassword.addEventListener('input', function() {
+                checkPasswordStrength();
+                checkPasswordMatch();
+            });
+        }
+        
+        // Confirm password checker
+        const regConfirm = document.getElementById('regConfirmPassword');
+        if (regConfirm) {
+            regConfirm.addEventListener('input', checkPasswordMatch);
+        }
+        
+        // Logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', logout);
+        }
+        
+        // Hamburger menu
+        const hamburger = document.getElementById('hamburger');
+        if (hamburger) {
+            hamburger.addEventListener('click', () => {
+                const navMenu = document.getElementById('navMenu');
+                if (navMenu) navMenu.classList.toggle('active');
+            });
+        }
+        
+        // Subject filter
+        const subjectFilter = document.getElementById('subjectFilter');
+        if (subjectFilter) {
+            subjectFilter.addEventListener('change', () => {
+                if (localStorage.getItem('token')) loadExams();
+            });
+        }
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            const loginModal = document.getElementById('loginModal');
+            const registerModal = document.getElementById('registerModal');
+            if (e.target === loginModal) closeModals();
+            if (e.target === registerModal) closeModals();
+        });
+    });
+    
+    // Initialize
+    checkAuth();
+    loadSubjects();
+    </script>
+</body>
+</html>

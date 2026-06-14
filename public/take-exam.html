@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take Exam - SmartAssess</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 100;
+            box-shadow: var(--shadow-lg);
+        }
+        .timer.warning {
+            background: var(--warning);
+            animation: pulse 1s infinite;
+        }
+        .timer.danger {
+            background: var(--danger);
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .question-nav {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            display: flex;
+            gap: 10px;
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+        }
+        .nav-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .nav-btn.answered {
+            background: var(--success);
+            color: white;
+        }
+        .nav-btn.current {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="timer" id="timer">60:00</div>
+        
+        <div class="card" id="examContent">
+            <div class="card-header">
+                <h2 id="examTitle">Loading Exam...</h2>
+                <span id="questionCounter">Question 1 of 0</span>
+            </div>
+            
+            <div id="questionContainer">
+                <div class="spinner"></div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                <button class="btn btn-secondary" id="prevBtn" disabled>
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>
+                <button class="btn btn-primary" id="nextBtn">
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="question-nav" id="questionNav"></div>
+    </div>
+    
+    <script src="/script.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const examId = window.location.pathname.split('/')[2];
+        const attemptId = urlParams.get('attempt');
+        let questions = [];
+        let currentIndex = 0;
+        let answers = {};
+        let timerInterval;
+        let timeLeft;
+        
+        // Load exam data
+        async function loadExam() {
+            const response = await fetch(`/api/exams/${examId}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const exam = await response.json();
+            
+            document.getElementById('examTitle').textContent = exam.title;
+            questions = exam.questions || [];
+            timeLeft = exam.time_limit * 60;
+            
+            updateTimerDisplay();
+            startTimer();
+            
+            if (questions.length > 0) {
+                displayQuestion(0);
+                buildQuestionNav();
+            }
+        }
+        
+        function displayQuestion(index) {
+            const q = questions[index];
+            if (!q) return;
+            
+            document.getElementById('questionCounter').textContent = `Question ${index + 1} of ${questions.length}`;
+            
+            const container = document.getElementById('questionContainer');
+            container.innerHTML = `
+                <div class="question-text">${escapeHtml(q.question_text)}</div>
+                <div class="options">
+                    <div class="option ${answers[q.id] === 'A' ? 'selected' : ''}" onclick="selectAnswer('A')">
+                        <div class="option-letter">A</div>
+                        <div>${escapeHtml(q.option_a)}</div>
+                    </div>
+                    <div class="option ${answers[q.id] === 'B' ? 'selected' : ''}" onclick="selectAnswer('B')">
+                        <div class="option-letter">B</div>
+                        <div>${escapeHtml(q.option_b)}</div>
+                    </div>
+                    <div class="option ${answers[q.id] === 'C' ? 'selected' : ''}" onclick="selectAnswer('C')">
+                        <div class="option-letter">C</div>
+                        <div>${escapeHtml(q.option_c)}</div>
+                    </div>
+                    <div class="option ${answers[q.id] === 'D' ? 'selected' : ''}" onclick="selectAnswer('D')">
+                        <div class="option-letter">D</div>
+                        <div>${escapeHtml(q.option_d)}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Update navigation buttons
+            document.getElementById('prevBtn').disabled = index === 0;
+            updateQuestionNavHighlight();
+        }
+        
+        function selectAnswer(answer) {
+            const currentQ = questions[currentIndex];
+            answers[currentQ.id] = answer;
+            displayQuestion(currentIndex);
+            updateQuestionNav();
+        }
+        
+        function nextQuestion() {
+            if (currentIndex < questions.length - 1) {
+                currentIndex++;
+                displayQuestion(currentIndex);
+            } else {
+                submitExam();
+            }
+        }
+        
+        function prevQuestion() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                displayQuestion(currentIndex);
+            }
+        }
+        
+        function buildQuestionNav() {
+            const nav = document.getElementById('questionNav');
+            nav.innerHTML = questions.map((_, i) => `
+                <button class="nav-btn" onclick="goToQuestion(${i})">${i + 1}</button>
+            `).join('');
+        }
+        
+        function updateQuestionNav() {
+            const btns = document.querySelectorAll('.nav-btn');
+            btns.forEach((btn, i) => {
+                const q = questions[i];
+                if (answers[q.id]) {
+                    btn.classList.add('answered');
+                } else {
+                    btn.classList.remove('answered');
+                }
+            });
+        }
+        
+        function updateQuestionNavHighlight() {
+            const btns = document.querySelectorAll('.nav-btn');
+            btns.forEach((btn, i) => {
+                btn.classList.remove('current');
+                if (i === currentIndex) {
+                    btn.classList.add('current');
+                }
+            });
+        }
+        
+        function goToQuestion(index) {
+            currentIndex = index;
+            displayQuestion(index);
+        }
+        
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    submitExam();
+                } else {
+                    timeLeft--;
+                    updateTimerDisplay();
+                }
+            }, 1000);
+        }
+        
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            const timerElement = document.getElementById('timer');
+            timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (timeLeft <= 60) {
+                timerElement.classList.add('danger');
+            } else if (timeLeft <= 300) {
+                timerElement.classList.add('warning');
+            }
+        }
+        
+        async function submitExam() {
+            clearInterval(timerInterval);
+            
+            const response = await fetch(`/api/exams/${examId}/submit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ attemptId, answers })
+            });
+            
+            const result = await response.json();
+            localStorage.setItem('lastExamResult', JSON.stringify(result));
+            window.location.href = `/results/${attemptId}`;
+        }
+        
+        document.getElementById('nextBtn').addEventListener('click', nextQuestion);
+        document.getElementById('prevBtn').addEventListener('click', prevQuestion);
+        
+        loadExam();
+    </script>
+</body>
+</html>

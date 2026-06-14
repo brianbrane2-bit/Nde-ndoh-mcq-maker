@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Results - SmartAssess</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+       <nav class="navbar">
+    <div class="logo">
+        <span class="logo-icon">📚</span>
+        <span>SmartAssess</span>
+    </div>
+    <div class="hamburger" id="hamburger">
+        <span></span><span></span><span></span>
+    </div>
+    <div class="nav-menu" id="navMenu">
+        <a href="/"><i class="fas fa-home"></i> Home</a>
+        <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        <a href="/create-exam"><i class="fas fa-plus-circle"></i> Create Exam</a>
+        <a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a>
+        <a href="/certificates"><i class="fas fa-certificate"></i> Certificates</a>
+        <a href="/profile"><i class="fas fa-user"></i> Profile</a>
+        <div id="authButtons" class="auth-buttons">
+            <button class="btn btn-outline" onclick="showLoginModal()">Login</button>
+            <button class="btn btn-primary" onclick="showRegisterModal()">Register</button>
+        </div>
+        <div id="userInfo" class="user-info" style="display: none;">
+            <span class="user-name" id="userName"></span>
+            <button class="btn btn-danger" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+</nav>
+        
+        <div id="resultsContent">
+            <div class="spinner"></div>
+        </div>
+    </div>
+    <!-- Export Buttons -->
+<div class="export-buttons">
+    <button class="btn-export btn-export-pdf" onclick="exportAsPDF()">
+        <i class="fas fa-file-pdf"></i> Export as PDF
+    </button>
+    <button class="btn-export btn-export-csv" onclick="exportAsCSV()">
+        <i class="fas fa-file-csv"></i> Export as CSV
+    </button>
+    <button class="btn-export btn-export-excel" onclick="exportAsExcel()">
+        <i class="fas fa-file-excel"></i> Export as Excel
+    </button>
+</div>
+    
+    <script src="/script.js"></script>
+    <script>
+        const attemptId = window.location.pathname.split('/')[2];
+        
+        async function loadResults() {
+            const response = await fetch(`/api/results/attempt/${attemptId}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await response.json();
+            
+            const container = document.getElementById('resultsContent');
+            container.innerHTML = `
+                <div class="result-summary">
+                    <div class="score-circle">
+                        <div class="score-number">${Math.round(data.percentage)}%</div>
+                    </div>
+                    <h2>${data.title}</h2>
+                    <div class="${data.passed ? 'passed' : 'failed'}">
+                        ${data.passed ? '✓ PASSED' : '✗ FAILED'}
+                    </div>
+                    <p style="margin-top: 20px;">Score: ${data.score} / ${data.totalPoints || data.score * 100 / data.percentage || 0} points</p>
+                    <p>Correct: ${data.correct_count} / ${data.total_questions} questions</p>
+                    ${data.passed ? `<button class="btn btn-primary" onclick="location.href='/certificates'"><i class="fas fa-certificate"></i> Get Certificate</button>` : ''}
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Detailed Results</h3>
+                    </div>
+                    <div id="detailedResults">
+                        ${data.details.map((detail, i) => `
+                            <div class="question-review" style="padding: 20px; border-bottom: 1px solid var(--gray-light);">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <strong>Question ${i + 1}</strong>
+                                    <span style="color: ${detail.is_correct ? 'var(--success)' : 'var(--danger)'}">
+                                        ${detail.is_correct ? '✓ Correct' : '✗ Incorrect'} (${detail.points_earned} pts)
+                                    </span>
+                                </div>
+                                <p style="margin: 15px 0;">${escapeHtml(detail.question_text)}</p>
+                                <div style="background: var(--gray-light); padding: 15px; border-radius: 10px; margin: 10px 0;">
+                                    <strong>Your answer:</strong> ${detail.student_answer ? detail.student_answer + ') ' + escapeHtml(detail[`option_${detail.student_answer?.toLowerCase()}`]) : 'Not answered'}
+                                </div>
+                                ${!detail.is_correct ? `
+                                    <div style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 10px;">
+                                        <strong>Correct answer:</strong> ${detail.correct_answer}) ${escapeHtml(detail[`option_${detail.correct_answer?.toLowerCase()}`])}
+                                    </div>
+                                ` : ''}
+                                ${detail.explanation ? `
+                                    <div style="background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; margin-top: 10px;">
+                                        <strong><i class="fas fa-info-circle"></i> Explanation:</strong><br>
+                                        ${escapeHtml(detail.explanation)}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        loadResults();
+    </script>
+    <script src="/export-utils.js"></script>
+<script>
+    let currentResults = null;
+    let currentUser = null;
+    
+    async function loadResults() {
+        const attemptId = window.location.pathname.split('/')[2];
+        const token = localStorage.getItem('token');
+        currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        const response = await fetch(`/api/results/attempt/${attemptId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        currentResults = data;
+        
+        // Display results (same as before)
+        displayResults(data);
+    }
+    
+    function exportAsPDF() {
+        if (currentResults) {
+            const exportData = {
+                title: currentResults.title,
+                student_name: currentUser.full_name,
+                score: currentResults.score,
+                total_points: currentResults.total_points || (currentResults.score * 100 / currentResults.percentage),
+                percentage: currentResults.percentage,
+                passed: currentResults.passed,
+                end_time: currentResults.end_time,
+                details: currentResults.details
+            };
+            exportToPDF(exportData, `${currentResults.title}_Results`);
+        }
+    }
+    
+    function exportAsCSV() {
+        if (currentResults) {
+            const exportData = {
+                title: currentResults.title,
+                student_name: currentUser.full_name,
+                score: currentResults.score,
+                total_points: currentResults.total_points,
+                percentage: currentResults.percentage,
+                passed: currentResults.passed,
+                end_time: currentResults.end_time,
+                details: currentResults.details
+            };
+            exportToCSV(exportData, `${currentResults.title}_Results`);
+        }
+    }
+    
+    function exportAsExcel() {
+        if (currentResults) {
+            const exportData = {
+                title: currentResults.title,
+                student_name: currentUser.full_name,
+                score: currentResults.score,
+                total_points: currentResults.total_points,
+                percentage: currentResults.percentage,
+                passed: currentResults.passed,
+                end_time: currentResults.end_time,
+                details: currentResults.details
+            };
+            exportToExcel(exportData, `${currentResults.title}_Results`);
+        }
+    }
+    
+    loadResults();
+</script>
+</body>
+</html>

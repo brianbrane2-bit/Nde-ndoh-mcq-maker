@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - SmartAssess</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <div class="logo">
+                <span class="logo-icon">📚</span>
+                <span>SmartAssess</span>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span></span><span></span><span></span>
+            </div>
+            <div class="nav-menu" id="navMenu">
+                <a href="/"><i class="fas fa-home"></i> Home</a>
+                <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a>
+                <a href="/certificates"><i class="fas fa-certificate"></i> Certificates</a>
+                <a href="/profile" class="active"><i class="fas fa-user"></i> Profile</a>
+                <div class="user-info">
+                    <span class="user-name" id="userName"></span>
+                    <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-user-circle"></i> My Profile</h3>
+            </div>
+            <div id="profileContent">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/script.js"></script>
+    <script>
+        async function loadProfile() {
+            const response = await fetch('/api/user/profile', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const user = await response.json();
+            
+            const container = document.getElementById('profileContent');
+            container.innerHTML = `
+                <form id="profileForm">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="fullName" value="${escapeHtml(user.full_name)}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" value="${escapeHtml(user.email)}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" value="${escapeHtml(user.username)}" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <input type="text" value="${user.role}" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label>Member Since</label>
+                        <input type="text" value="${new Date(user.created_at).toLocaleDateString()}" disabled>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Profile</button>
+                </form>
+            `;
+            
+            document.getElementById('profileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const full_name = document.getElementById('fullName').value;
+                const email = document.getElementById('email').value;
+                
+                const updateResponse = await fetch('/api/user/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ full_name, email })
+                });
+                
+                if (updateResponse.ok) {
+                    showNotification('Profile updated successfully!', 'success');
+                    const userData = JSON.parse(localStorage.getItem('user'));
+                    userData.full_name = full_name;
+                    userData.email = email;
+                    localStorage.setItem('user', JSON.stringify(userData));
+                    document.getElementById('userName').textContent = full_name;
+                } else {
+                    showNotification('Update failed', 'error');
+                }
+            });
+        }
+        
+        loadProfile();
+    </script>
+</body>
+</html>

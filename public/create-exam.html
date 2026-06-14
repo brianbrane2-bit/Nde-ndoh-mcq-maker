@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Exam - SmartAssess</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+       <nav class="navbar">
+    <div class="logo">
+        <span class="logo-icon">📚</span>
+        <span>SmartAssess</span>
+    </div>
+    <div class="hamburger" id="hamburger">
+        <span></span><span></span><span></span>
+    </div>
+    <div class="nav-menu" id="navMenu">
+        <a href="/"><i class="fas fa-home"></i> Home</a>
+        <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        <a href="/create-exam" class="active"><i class="fas fa-plus-circle"></i> Create Exam</a>
+        <a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a>
+        <a href="/certificates"><i class="fas fa-certificate"></i> Certificates</a>
+        <a href="/profile"><i class="fas fa-user"></i> Profile</a>
+        <!-- Only show user info, no login/register buttons -->
+        <div id="userInfo" class="user-info">
+            <span class="user-name" id="userName"></span>
+            <button class="btn btn-danger" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+</nav>
+
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-edit"></i> Create New Exam</h2>
+            </div>
+            
+            <form id="examForm">
+                <div class="form-group">
+                    <label>Exam Title *</label>
+                    <input type="text" id="examTitle" required placeholder="e.g., Mathematics Final Exam">
+                </div>
+                
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Subject *</label>
+                        <select id="examSubject" required>
+                            <option value="">Select Subject</option>
+                            <option>Mathematics</option>
+                            <option>Science</option>
+                            <option>English</option>
+                            <option>History</option>
+                            <option>Computer Science</option>
+                            <option>Business</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Grade Level</label>
+                        <select id="examGrade">
+                            <option value="">Select Grade</option>
+                            <option>Grade 9</option>
+                            <option>Grade 10</option>
+                            <option>Grade 11</option>
+                            <option>Grade 12</option>
+                            <option>University</option>
+                            <option>Professional</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="examDescription" rows="3" placeholder="Describe what this exam covers..."></textarea>
+                </div>
+                
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Time Limit (minutes)</label>
+                        <input type="number" id="timeLimit" value="60" min="1" max="180">
+                    </div>
+                    <div class="form-group">
+                        <label>Passing Score (%)</label>
+                        <input type="number" id="passingScore" value="60" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Attempts Allowed</label>
+                        <input type="number" id="attemptsAllowed" value="1" min="1" max="5">
+                    </div>
+                </div>
+                
+                <hr style="margin: 30px 0;">
+                
+                <h3><i class="fas fa-question-circle"></i> Questions</h3>
+                <div id="questionsContainer"></div>
+                
+                <button type="button" class="btn btn-secondary" onclick="addQuestion()" style="margin: 20px 0;">
+                    <i class="fas fa-plus"></i> Add Question
+                </button>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-save"></i> Save Exam
+                </button>
+            </form>
+        </div>
+    </div>
+    <!-- File Upload Section -->
+<div class="card" style="margin-bottom: 20px; background: var(--lighter);">
+    <div class="card-header">
+        <h3><i class="fas fa-upload"></i> Bulk Upload Questions</h3>
+        <span class="exam-badge">CSV/Excel Format</span>
+    </div>
+    <div class="file-upload-area" id="fileUploadArea">
+        <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--accent);"></i>
+        <p>Drag & drop or click to upload CSV/Excel file</p>
+        <p style="font-size: 12px; color: var(--text-light); margin-top: 10px;">
+            Format: Question Text, Option A, Option B, Option C, Option D, Correct Answer, Points, Explanation
+        </p>
+        <input type="file" id="questionFile" accept=".csv,.xlsx,.xls" style="display: none;">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('questionFile').click()">
+            <i class="fas fa-folder-open"></i> Select File
+        </button>
+    </div>
+    <div id="uploadPreview" style="margin-top: 20px; display: none;">
+        <h4>Preview Questions</h4>
+        <div id="previewTable"></div>
+        <button type="button" class="btn btn-primary" onclick="addBulkQuestions()">
+            <i class="fas fa-plus-circle"></i> Add All Questions
+        </button>
+    </div>
+</div>
+
+    <script>
+        let questionCount = 0;
+        
+        function addQuestion() {
+            questionCount++;
+            const container = document.getElementById('questionsContainer');
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'card';
+            questionDiv.style.marginBottom = '20px';
+            questionDiv.id = `question-${questionCount}`;
+            questionDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between;">
+                    <h4>Question ${questionCount}</h4>
+                    <button type="button" class="btn-danger" onclick="removeQuestion(${questionCount})" style="padding: 5px 10px;">Remove</button>
+                </div>
+                <div class="form-group">
+                    <label>Question Text</label>
+                    <textarea class="question-text" data-q="${questionCount}" rows="2" required></textarea>
+                </div>
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label>A) Option A</label>
+                        <input class="option-a" data-q="${questionCount}" type="text" required>
+                    </div>
+                    <div class="form-group">
+                        <label>B) Option B</label>
+                        <input class="option-b" data-q="${questionCount}" type="text" required>
+                    </div>
+                    <div class="form-group">
+                        <label>C) Option C</label>
+                        <input class="option-c" data-q="${questionCount}" type="text" required>
+                    </div>
+                    <div class="form-group">
+                        <label>D) Option D</label>
+                        <input class="option-d" data-q="${questionCount}" type="text" required>
+                    </div>
+                </div>
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Correct Answer</label>
+                        <select class="correct-answer" data-q="${questionCount}" required>
+                            <option value="">Select</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Points</label>
+                        <input class="points" data-q="${questionCount}" type="number" value="1" min="1" max="10">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Explanation (optional)</label>
+                    <textarea class="explanation" data-q="${questionCount}" rows="2" placeholder="Explain why the answer is correct..."></textarea>
+                </div>
+            `;
+            container.appendChild(questionDiv);
+        }
+        
+        function removeQuestion(qId) {
+            const element = document.getElementById(`question-${qId}`);
+            if (element) element.remove();
+        }
+        
+        document.getElementById('examForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Get exam details
+            const examData = {
+                title: document.getElementById('examTitle').value,
+                subject: document.getElementById('examSubject').value,
+                grade_level: document.getElementById('examGrade').value,
+                description: document.getElementById('examDescription').value,
+                time_limit: parseInt(document.getElementById('timeLimit').value),
+                passing_score: parseInt(document.getElementById('passingScore').value),
+                attempts_allowed: parseInt(document.getElementById('attemptsAllowed').value)
+            };
+            
+            // Create exam
+            const examResponse = await fetch('/api/exams', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(examData)
+            });
+            
+            const examResult = await examResponse.json();
+            const examId = examResult.id;
+            
+            // Collect questions
+            const questions = [];
+            const questionDivs = document.querySelectorAll('#questionsContainer > div');
+            
+            for (let div of questionDivs) {
+                const qNum = div.id.split('-')[1];
+                questions.push({
+                    question_text: div.querySelector(`.question-text`).value,
+                    option_a: div.querySelector(`.option-a`).value,
+                    option_b: div.querySelector(`.option-b`).value,
+                    option_c: div.querySelector(`.option-c`).value,
+                    option_d: div.querySelector(`.option-d`).value,
+                    correct_answer: div.querySelector(`.correct-answer`).value,
+                    points: parseInt(div.querySelector(`.points`).value),
+                    explanation: div.querySelector(`.explanation`).value
+                });
+            }
+            
+            // Add questions
+            const questionsResponse = await fetch(`/api/exams/${examId}/questions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ questions })
+            });
+            
+            // Publish exam
+            await fetch(`/api/exams/${examId}/publish`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            
+            alert('Exam created and published successfully!');
+            window.location.href = '/dashboard';
+        });
+        
+        // Add first question by default
+        addQuestion();
+        // File upload handling
+const fileUploadArea = document.getElementById('fileUploadArea');
+const questionFile = document.getElementById('questionFile');
+let parsedQuestions = [];
+
+// Drag and drop handlers
+fileUploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    fileUploadArea.classList.add('drag-over');
+});
+
+fileUploadArea.addEventListener('dragleave', () => {
+    fileUploadArea.classList.remove('drag-over');
+});
+
+fileUploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    fileUploadArea.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+});
+
+fileUploadArea.addEventListener('click', () => {
+    questionFile.click();
+});
+
+questionFile.addEventListener('change', (e) => {
+    if (e.target.files[0]) processFile(e.target.files[0]);
+});
+
+function processFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const content = e.target.result;
+        parseCSV(content);
+    };
+    reader.readAsText(file);
+}
+
+function parseCSV(content) {
+    const lines = content.split('\n');
+    const headers = lines[0].split(',');
+    
+    parsedQuestions = [];
+    for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const values = lines[i].split(',');
+        if (values.length >= 6) {
+            parsedQuestions.push({
+                question_text: values[0],
+                option_a: values[1],
+                option_b: values[2],
+                option_c: values[3],
+                option_d: values[4],
+                correct_answer: values[5].trim().toUpperCase(),
+                points: values[6] || 1,
+                explanation: values[7] || ''
+            });
+        }
+    }
+    
+    // Show preview
+    showPreview();
+}
+
+function showPreview() {
+    const previewDiv = document.getElementById('uploadPreview');
+    const previewTable = document.getElementById('previewTable');
+    
+    previewTable.innerHTML = `
+        <table class="question-table">
+            <thead>
+                <tr><th>Question</th><th>Options</th><th>Correct</th><th>Points</th></tr>
+            </thead>
+            <tbody>
+                ${parsedQuestions.map((q, i) => `
+                    <tr>
+                        <td>${escapeHtml(q.question_text.substring(0, 50))}...</td>
+                        <td>A: ${escapeHtml(q.option_a)}<br>B: ${escapeHtml(q.option_b)}<br>C: ${escapeHtml(q.option_c)}<br>D: ${escapeHtml(q.option_d)}</td>
+                        <td>${q.correct_answer}</td>
+                        <td>${q.points}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        <p>Total: ${parsedQuestions.length} questions ready to import</p>
+    `;
+    previewDiv.style.display = 'block';
+}
+
+function addBulkQuestions() {
+    parsedQuestions.forEach(q => {
+        addQuestionWithData(q);
+    });
+    document.getElementById('uploadPreview').style.display = 'none';
+    showNotification(`${parsedQuestions.length} questions added!`, 'success');
+    parsedQuestions = [];
+}
+
+function addQuestionWithData(q) {
+    questionCount++;
+    const container = document.getElementById('questionsContainer');
+    const questionDiv = document.createElement('div');
+    questionDiv.className = 'card';
+    questionDiv.style.marginBottom = '20px';
+    questionDiv.id = `question-${questionCount}`;
+    questionDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between;">
+            <h4>Question ${questionCount}</h4>
+            <button type="button" class="btn-danger" onclick="removeQuestion(${questionCount})" style="padding: 5px 10px;">Remove</button>
+        </div>
+        <div class="form-group">
+            <label>Question Text</label>
+            <textarea class="question-text" data-q="${questionCount}" rows="2" required>${escapeHtml(q.question_text)}</textarea>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="form-group">
+                <label>A) Option A</label>
+                <input class="option-a" data-q="${questionCount}" type="text" value="${escapeHtml(q.option_a)}" required>
+            </div>
+            <div class="form-group">
+                <label>B) Option B</label>
+                <input class="option-b" data-q="${questionCount}" type="text" value="${escapeHtml(q.option_b)}" required>
+            </div>
+            <div class="form-group">
+                <label>C) Option C</label>
+                <input class="option-c" data-q="${questionCount}" type="text" value="${escapeHtml(q.option_c)}" required>
+            </div>
+            <div class="form-group">
+                <label>D) Option D</label>
+                <input class="option-d" data-q="${questionCount}" type="text" value="${escapeHtml(q.option_d)}" required>
+            </div>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div class="form-group">
+                <label>Correct Answer</label>
+                <select class="correct-answer" data-q="${questionCount}" required>
+                    <option value="">Select</option>
+                    <option value="A" ${q.correct_answer === 'A' ? 'selected' : ''}>A</option>
+                    <option value="B" ${q.correct_answer === 'B' ? 'selected' : ''}>B</option>
+                    <option value="C" ${q.correct_answer === 'C' ? 'selected' : ''}>C</option>
+                    <option value="D" ${q.correct_answer === 'D' ? 'selected' : ''}>D</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Points</label>
+                <input class="points" data-q="${questionCount}" type="number" value="${q.points}" min="1" max="10">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Explanation</label>
+            <textarea class="explanation" data-q="${questionCount}" rows="2" placeholder="Explain why the answer is correct...">${escapeHtml(q.explanation || '')}</textarea>
+        </div>
+    `;
+    container.appendChild(questionDiv);
+}
+    </script>
+    <script src="/script.js"></script>
+</body>
+</html>

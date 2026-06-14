@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - SmartAssess</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .stat-card { cursor: pointer; }
+        .exam-card { cursor: pointer; }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+        }
+        .toast.success { border-left: 4px solid #10B981; }
+        .toast.error { border-left: 4px solid #EF4444; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+    <div class="logo">
+        <span class="logo-icon">📚</span>
+        <span>SmartAssess</span>
+    </div>
+    <div class="hamburger" id="hamburger">
+        <span></span><span></span><span></span>
+    </div>
+    <div class="nav-menu" id="navMenu">
+        <a href="/"><i class="fas fa-home"></i> Home</a>
+        <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        <a href="/create-exam"><i class="fas fa-plus-circle"></i> Create Exam</a>
+        <a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a>
+        <a href="/certificates"><i class="fas fa-certificate"></i> Certificates</a>
+        <a href="/profile"><i class="fas fa-user"></i> Profile</a>
+        <div id="authButtons" class="auth-buttons">
+            <button class="btn btn-outline" onclick="showLoginModal()">Login</button>
+            <button class="btn btn-primary" onclick="showRegisterModal()">Register</button>
+        </div>
+        <div id="userInfo" class="user-info" style="display: none;">
+            <span class="user-name" id="userName"></span>
+            <button class="btn btn-danger" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+</nav>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <i class="fas fa-file-alt" style="font-size: 32px;"></i>
+                <div class="stat-value" id="totalExams">0</div>
+                <div class="stat-label">Exams Taken</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-chart-line" style="font-size: 32px;"></i>
+                <div class="stat-value" id="avgScore">0%</div>
+                <div class="stat-label">Average Score</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-trophy" style="font-size: 32px;"></i>
+                <div class="stat-value" id="examsPassed">0</div>
+                <div class="stat-label">Exams Passed</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-star" style="font-size: 32px;"></i>
+                <div class="stat-value" id="bestScore">0%</div>
+                <div class="stat-label">Best Score</div>
+            </div>
+        </div>
+
+        <!-- Teacher Section -->
+        <div id="teacherSection" style="display: none;">
+            <div class="card" style="margin-bottom: 20px;">
+                <div class="card-header">
+                    <h3><i class="fas fa-plus-circle"></i> Quick Actions</h3>
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn btn-primary" onclick="location.href='/create-exam'">
+                        <i class="fas fa-plus"></i> Create New Exam
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Attempts -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-history"></i> Recent Exam Attempts</h3>
+            </div>
+            <div id="recentAttempts">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `toast ${type}`;
+            notification.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${message}`;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function loadDashboard() {
+            const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            document.getElementById('userName').textContent = user.full_name || user.username;
+            
+            // Show teacher section if applicable
+            if (user.role === 'teacher' || user.role === 'admin') {
+                document.getElementById('teacherSection').style.display = 'block';
+                document.getElementById('createExamLink').style.display = 'block';
+            }
+            
+            // Load stats
+            try {
+                const statsResponse = await fetch('/api/analytics/student', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const stats = await statsResponse.json();
+                
+                document.getElementById('totalExams').textContent = stats.total_exams_taken || 0;
+                document.getElementById('avgScore').textContent = `${Math.round(stats.average_score || 0)}%`;
+                document.getElementById('examsPassed').textContent = stats.exams_passed || 0;
+                document.getElementById('bestScore').textContent = `${Math.round(stats.highest_score || 0)}%`;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+            
+            // Load recent attempts
+            try {
+                const historyResponse = await fetch('/api/results/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const history = await historyResponse.json();
+                
+                const container = document.getElementById('recentAttempts');
+                if (history.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; padding: 40px;">No exam attempts yet. Take your first exam!</p>';
+                    return;
+                }
+                
+                container.innerHTML = history.map(attempt => `
+                    <div class="exam-card" style="margin-bottom: 15px;" onclick="location.href='/results/${attempt.id}'">
+                        <div style="padding: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <h3>${escapeHtml(attempt.title)}</h3>
+                                    <p style="color: var(--gray); margin-top: 5px;">${attempt.subject || 'General'}</p>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 28px; font-weight: bold; color: ${attempt.passed ? '#10B981' : '#EF4444'}">
+                                        ${Math.round(attempt.percentage)}%
+                                    </div>
+                                    <span style="background: ${attempt.passed ? '#10B981' : '#EF4444'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px;">
+                                        ${attempt.passed ? 'PASSED' : 'FAILED'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="margin-top: 15px; color: var(--gray); font-size: 14px;">
+                                <i class="fas fa-calendar"></i> ${new Date(attempt.end_time).toLocaleDateString()}
+                                &nbsp;&nbsp;
+                                <i class="fas fa-check-circle"></i> ${attempt.correct_count}/${attempt.total_questions} Correct
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+        
+        // Logout function
+        function logout() {
+            localStorage.clear();
+            showNotification('Logged out successfully', 'success');
+            window.location.href = '/';
+        }
+        
+        // Event listeners
+        document.getElementById('logoutBtn')?.addEventListener('click', logout);
+        document.getElementById('hamburger')?.addEventListener('click', () => {
+            document.getElementById('navMenu').classList.toggle('active');
+        });
+        
+        // Check authentication
+        if (!localStorage.getItem('token')) {
+            window.location.href = '/';
+        } else {
+            loadDashboard();
+        }
+    </script>
+</body>
+</html>

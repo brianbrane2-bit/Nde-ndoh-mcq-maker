@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartAssess - Professional MCQ Assessment Platform</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="animated-bg"></div>
+    
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="logo">
+                <span class="logo-icon">📚</span>
+                <span>SmartAssess</span>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <div class="nav-menu" id="navMenu">
+                <a href="/" class="active"><i class="fas fa-home"></i> Home</a>
+                <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a>
+                <a href="/certificates"><i class="fas fa-certificate"></i> Certificates</a>
+                <div class="user-info" id="userInfo" style="display: none;">
+                    <img src="/assets/default-avatar.png" alt="Avatar" class="user-avatar" id="userAvatar">
+                    <span class="user-name" id="userName"></span>
+                    <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+                <div id="authButtons">
+                    <button class="btn btn-outline" onclick="showLoginModal()"><i class="fas fa-sign-in-alt"></i> Login</button>
+                    <button class="btn btn-primary" onclick="showRegisterModal()"><i class="fas fa-user-plus"></i> Register</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <div class="hero fade-in">
+            <h1>Welcome to SmartAssess</h1>
+            <p>The Ultimate Automated MCQ Assessment Platform</p>
+            <button class="btn btn-primary" onclick="scrollToExams()">
+                <i class="fas fa-play"></i> Get Started
+            </button>
+        </div>
+
+        <!-- Features -->
+        <div class="stats-grid" style="margin-bottom: 40px;">
+            <div class="stat-card">
+                <i class="fas fa-robot" style="font-size: 48px; color: var(--primary);"></i>
+                <h3>Auto-Grading</h3>
+                <p>Instant results with detailed feedback</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-chart-simple" style="font-size: 48px; color: var(--primary);"></i>
+                <h3>Analytics Dashboard</h3>
+                <p>Track your progress over time</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-certificate" style="font-size: 48px; color: var(--primary);"></i>
+                <h3>Certificates</h3>
+                <p>Earn printable certificates for passing</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-shield-alt" style="font-size: 48px; color: var(--primary);"></i>
+                <h3>Secure Platform</h3>
+                <p>Protected with industry-standard security</p>
+            </div>
+        </div>
+
+        <!-- Available Exams Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-file-alt"></i> Available Exams</h2>
+                <select id="subjectFilter" class="btn-outline" style="padding: 8px 16px;">
+                    <option value="all">All Subjects</option>
+                </select>
+            </div>
+            <div id="examsList" class="exam-grid">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2><i class="fas fa-sign-in-alt"></i> Login</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="loginUsername" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+            </form>
+            <p style="margin-top: 15px; text-align: center;">
+                Don't have an account? <a href="#" onclick="showRegisterModal(); return false;">Register</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <h2><i class="fas fa-user-plus"></i> Register</h2>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="regFullName" required>
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="regUsername" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="regEmail" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="regPassword" required>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="regRole">
+                        <option value="student">Student</option>
+                        <option value="teacher">Teacher</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Register</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/script.js"></script>
+    <script>
+        // Load subjects filter
+        async function loadSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const filter = document.getElementById('subjectFilter');
+            subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.subject;
+                option.textContent = subject.subject;
+                filter.appendChild(option);
+            });
+        }
+
+        function scrollToExams() {
+            document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        loadSubjects();
+    </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - SmartAssess</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <div class="logo">
+                <span class="logo-icon">📚</span>
+                <span>SmartAssess</span>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span></span><span></span><span></span>
+            </div>
+            <div class="nav-menu" id="navMenu">
+                <a href="/"><i class="fas fa-home"></i> Home</a>
+                <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="/analytics" class="active"><i class="fas fa-chart-line"></i> Analytics</a>
+                <a href="/certificates"><i class="fas fa-certificate"></i> Certificates</a>
+                <div class="user-info">
+                    <span class="user-name" id="userName"></span>
+                    <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <i class="fas fa-chart-line" style="font-size: 32px;"></i>
+                <div class="stat-value" id="avgScore">0%</div>
+                <div class="stat-label">Average Score</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-trophy" style="font-size: 32px;"></i>
+                <div class="stat-value" id="bestScore">0%</div>
+                <div class="stat-label">Best Score</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-file-alt" style="font-size: 32px;"></i>
+                <div class="stat-value" id="totalExams">0</div>
+                <div class="stat-label">Total Exams</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-check-circle" style="font-size: 32px;"></i>
+                <div class="stat-value" id="passRate">0%</div>
+                <div class="stat-label">Pass Rate</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3>Performance Trend</h3>
+            </div>
+            <canvas id="performanceChart" height="100"></canvas>
+        </div>
+        
+        <div class="card" id="teacherAnalytics" style="display: none;">
+            <div class="card-header">
+                <h3>Exam Analytics (Teacher View)</h3>
+            </div>
+            <div id="teacherStats"></div>
+        </div>
+    </div>
+    
+    <script src="/script.js"></script>
+    <script>
+        let performanceChart;
+        
+        async function loadAnalytics() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            // Load student stats
+            const statsResponse = await fetch('/api/analytics/student', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const stats = await statsResponse.json();
+            
+            document.getElementById('avgScore').textContent = `${Math.round(stats.average_score || 0)}%`;
+            document.getElementById('bestScore').textContent = `${Math.round(stats.highest_score || 0)}%`;
+            document.getElementById('totalExams').textContent = stats.total_exams_taken || 0;
+            const passRate = stats.exams_passed && stats.total_exams_taken ? 
+                Math.round((stats.exams_passed / stats.total_exams_taken) * 100) : 0;
+            document.getElementById('passRate').textContent = `${passRate}%`;
+            
+            // Load history for chart
+            const historyResponse = await fetch('/api/results/history', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const history = await historyResponse.json();
+            
+            if (performanceChart) performanceChart.destroy();
+            
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: history.slice(0, 10).map(h => new Date(h.end_time).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Score Percentage',
+                        data: history.slice(0, 10).map(h => h.percentage),
+                        borderColor: '#4F46E5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    }
+                }
+            });
+            
+            // Teacher view
+            if (user.role === 'teacher' || user.role === 'admin') {
+                document.getElementById('teacherAnalytics').style.display = 'block';
+                const teacherResponse = await fetch('/api/analytics/teacher', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const teacherStats = await teacherResponse.json();
+                
+                document.getElementById('teacherStats').innerHTML = `
+                    <div class="exam-grid">
+                        ${teacherStats.map(stat => `
+                            <div class="exam-card">
+                                <div style="padding: 20px;">
+                                    <h3>${escapeHtml(stat.title)}</h3>
+                                    <div class="stats-grid" style="margin-top: 15px;">
+                                        <div>
+                                            <div style="font-size: 20px; font-weight: bold;">${stat.total_attempts || 0}</div>
+                                            <div style="font-size: 12px;">Attempts</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 20px; font-weight: bold;">${stat.unique_students || 0}</div>
+                                            <div style="font-size: 12px;">Students</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 20px; font-weight: bold;">${Math.round(stat.average_score || 0)}%</div>
+                                            <div style="font-size: 12px;">Average</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+        
+        loadAnalytics();
+    </script>
+</body>
+</html>
