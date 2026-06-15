@@ -18,8 +18,5 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
-  },
-  "keywords": ["assessment", "mcq", "education"],
-  "author": "Your Name",
-  "license": "ISC"
+  }
 }
